@@ -46,7 +46,7 @@ sudo make install   # optional: installs striq CLI to /usr/local/bin
 
 Builds on Linux, macOS, and any POSIX system with a C11 compiler.
 
-> **Python bindings:** [py-striq](https://github.com/NahumResearch/py-striq) (cffi wrapper). `pip install striq` coming soon.
+> **Python bindings:** [py-striq](https://github.com/NahumResearch/py-striq). `pip install striq`
 
 ---
 
