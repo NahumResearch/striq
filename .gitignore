@@ -53,3 +53,11 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# STRIQ build output directory
+build/
+# STRIQ binary format files (generated during tests/demos)
+*.striq
+# Benchmark datasets — download via bench/datasets/download.sh
+bench/datasets/*.csv
+bench/datasets/*.txt

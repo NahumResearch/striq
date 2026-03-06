@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux / gcc
+            os: ubuntu-latest
+            cc: gcc
+            artifact: linux-x86_64
+            shell: bash
+          - name: Linux / clang
+            os: ubuntu-latest
+            cc: clang
+            artifact: ""
+            shell: bash
+          - name: macOS / clang
+            os: macos-latest
+            cc: clang
+            artifact: macos-arm64
+            shell: bash
+          - name: Windows / gcc
+            os: windows-latest
+            cc: gcc
+            artifact: windows-x86_64
+            shell: msys2
+
+    env:
+      CC: ${{ matrix.cc }}
+
+    defaults:
+      run:
+        shell: ${{ matrix.shell == 'msys2' && 'msys2 {0}' || 'bash' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSYS2 (Windows)
+        if: matrix.shell == 'msys2'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc make
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          dpkg -s liblz4-dev >/dev/null 2>&1 || sudo apt-get install -y liblz4-dev
+          dpkg -s libzstd-dev >/dev/null 2>&1 || sudo apt-get install -y libzstd-dev
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew list lz4 >/dev/null 2>&1 || brew install lz4
+          brew list zstd >/dev/null 2>&1 || brew install zstd
+
+      - name: Build
+        run: make
+
+      - name: Test
+        run: make test
+
+      - name: Check CLI
+        run: ./build/striq --help || ./build/striq.exe --help || true
+
+      - name: Package artifact (Unix)
+        if: matrix.artifact != '' && runner.os != 'Windows'
+        run: |
+          mkdir -p dist/striq/lib dist/striq/include dist/striq/bin
+          cp build/libstriq.a dist/striq/lib/
+          cp include/striq.h  dist/striq/include/
+          cp build/striq      dist/striq/bin/
+          tar -czf "striq-${{ matrix.artifact }}.tar.gz" -C dist striq
+
+      - name: Package artifact (Windows)
+        if: matrix.artifact != '' && runner.os == 'Windows'
+        run: |
+          mkdir -p dist/striq/lib dist/striq/include dist/striq/bin
+          cp build/libstriq.a dist/striq/lib/
+          cp include/striq.h  dist/striq/include/
+          cp build/striq.exe  dist/striq/bin/
+          tar -czf "striq-${{ matrix.artifact }}.tar.gz" -C dist striq
+
+      - name: Upload artifact
+        if: matrix.artifact != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: striq-${{ matrix.artifact }}
+          path: striq-${{ matrix.artifact }}.tar.gz
+
+  release:
+    name: Tag & Release
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: |
+          echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag already exists
+        id: tag
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "Tag v${{ steps.version.outputs.version }} already exists — skipping."
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download all artifacts
+        if: steps.tag.outputs.created == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create tag and GitHub release
+        if: steps.tag.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" artifacts/*.tar.gz \
+            --title "$TAG" \
+            --generate-notes
