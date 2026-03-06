@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <math.h>
 
 /*
  * Kahan compensated summation — prevents floating-point drift when
@@ -1079,7 +1080,7 @@ striq_status_t engine_query_downsample(
         : 0.0;
 
     for (uint32_t i = 0; i < n_points; i++) {
-        out_values[i] = 0.0 / 0.0;
+        out_values[i] = NAN;
         if (out_ts) out_ts[i] = t_first + (int64_t)(time_step * (double)i);
     }
 
@@ -1210,7 +1211,7 @@ static double eval_pla_at_row(
         }
         cursor += (uint32_t)L;
     }
-    return 0.0 / 0.0;
+    return NAN;
 }
 
 static inline bool codec_is_lossless(striq_codec_t c)
@@ -1269,7 +1270,7 @@ striq_status_t engine_query_value_at(
                     out_values[c] = vals[row];
                     free(vals);
                 } else {
-                    out_values[c] = 0.0 / 0.0;
+                    out_values[c] = NAN;
                 }
                 if (out_errors) {
                     striq_codec_t base = CODEC_BASE(codec_byte);
@@ -1277,7 +1278,7 @@ striq_status_t engine_query_value_at(
                         ? 0.0 : p->col_epsilons[col_indices[c]];
                 }
             } else {
-                out_values[c] = 0.0 / 0.0;
+                out_values[c] = NAN;
                 if (out_errors) out_errors[c] = -1.0;
             }
         }
@@ -1382,7 +1383,7 @@ striq_status_t engine_query_scan(
                     free(vals);
                 } else {
                     for (uint32_t r = 0; r < take; r++)
-                        out_values[(written + r) * n_cols + c] = 0.0 / 0.0;
+                        out_values[(written + r) * n_cols + c] = NAN;
                 }
             }
         }

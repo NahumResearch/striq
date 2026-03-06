@@ -20,6 +20,7 @@
 
 #include "../types.h"
 #include <stddef.h>
+#include <string.h>
 
 /*
  * Fit a Chebyshev-3 polynomial to `count` values within epsilon.
@@ -66,8 +67,8 @@ size_t cheb3_find_max_length(
 static inline void cheb_seg_read(const uint8_t *src,
                                   double c[4], uint16_t *length)
 {
-    __builtin_memcpy(c,      src,      32);
-    __builtin_memcpy(length, src + 32, 2);
+    memcpy(c,      src,      32);
+    memcpy(length, src + 32, 2);
 }
 
 /*
@@ -76,8 +77,8 @@ static inline void cheb_seg_read(const uint8_t *src,
 static inline void cheb_seg_write(uint8_t *dst,
                                    const double c[4], uint16_t length)
 {
-    __builtin_memcpy(dst,      c,       32);
-    __builtin_memcpy(dst + 32, &length, 2);
+    memcpy(dst,      c,       32);
+    memcpy(dst + 32, &length, 2);
 }
 
 #define CHEB_SEG_BYTES 34u
